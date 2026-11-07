@@ -1,0 +1,106 @@
+import tkinter as tk
+from datetime import datetime, date
+
+# Main list to store dictionaries of event data
+all_events = []
+
+def add_event():
+    name = name_entry.get().strip()
+    date_text = date_entry.get().strip()
+    
+    # 1. Make sure the user typed an event name
+    if not name:
+        status_label.config(text="Please enter an event name.", fg="red")
+        return
+
+    parts = date_text.split(".")
+    if len(parts) == 3 and all(p.isdigit() for p in parts): # kak rabortaet p.isdigit()
+        try:
+            # Convert string to date object for math & sorting
+            event_date = datetime.strptime(date_text, "%d.%m.%Y").date()
+
+            today = date.today()
+            delta = event_date - today
+            days_remaining = delta.days
+
+            # Create the event record dictionary
+            event_record = {
+                "name": name,
+                "date_str": date_text,
+                "date_obj": event_date,
+                "days_left": days_remaining
+            }
+            
+            all_events.append(event_record)
+
+            # 2. Sort the list chronologically by date objects
+            # (Nearest/past dates at top, furthest dates at the bottom)
+            all_events.sort(key=lambda x: x['date_obj']) # chto takoe lambda 
+ 
+            # Clear entry boxes for the next input
+            name_entry.delete(0, tk.END)
+            date_entry.delete(0, tk.END)
+
+            # Refresh the visual display list
+            update_display()
+            status_label.config(text="Event added successfully!", fg="green")
+            return
+
+        except ValueError:
+            status_label.config(text="Invalid date! (Check for impossible days like Feb 31)", fg="red")
+            return
+
+    status_label.config(text="Invalid format. Please use DD.MM.YYYY", fg="red")
+
+def update_display():
+    # Enable the text widget temporarily to insert text
+    display_box.config(state=tk.NORMAL)
+    display_box.delete("1.0", tk.END)
+    
+    for event in all_events:
+        days = event['days_left']
+        if days > 0:
+            time_text = f"{days} days left"
+        elif days == 0:
+            time_text = "Today!"
+        else:
+            time_text = f"{-(days)} days ago"
+            
+        line = f"• {event['name']} ({event['date_str']}) — {time_text}\n"
+        display_box.insert(tk.END, line)
+        
+    # Make it read-only again so users can't manually type inside it
+    display_box.config(state=tk.DISABLED)
+
+# --- GUI Window Setup ---
+root = tk.Tk()
+root.title("Event Countdown Tracker")
+root.geometry("400x450")
+
+# Event Name Field
+tk.Label(root, text="Event Name:", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+name_entry = tk.Entry(root, width=30, font=("Arial", 11))
+name_entry.pack(pady=5)
+
+# Date Field
+tk.Label(root, text="Date (DD.MM.YYYY):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+date_entry = tk.Entry(root, width=30, font=("Arial", 11))
+date_entry.pack(pady=5)
+
+# Submit Button
+submit_btn = tk.Button(root, text="Add Event", command=add_event, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
+submit_btn.pack(pady=10)
+
+# Status Feedback Label
+status_label = tk.Label(root, text="", font=("Arial", 9))
+status_label.pack(pady=2)
+
+# Display Area Header
+tk.Label(root, text="Saved Events (Closest to Furthest):", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+
+# Text Box to show stored events
+display_box = tk.Text(root, height=10, width=45, state=tk.DISABLED, font=("Arial", 10))
+display_box.pack(pady=5)
+
+# Start the application loop
+root.mainloop()
