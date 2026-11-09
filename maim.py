@@ -1,214 +1,143 @@
 import tkinter as tk
-from tkinter import colorchooser, messagebox
 from datetime import datetime, date
 
-class SparrowTimelineApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Sparrow Timeline with Clustering")
-        self.root.geometry("900x450")
+# Main list to store dictionaries of event data
+all_events = []
+def add_event():
+    name = name_entry.get().strip()
+    date_text = date_entry.get().strip()
+    
+    # 1. Make sure the user typed an event name
+    if not name:
+        status_label.config(text="Please enter an event name.", fg="red")
+        return
 
-        self.events = []
-        self.selected_color = "#3498db"
-        self.origin_x = 80              # Left margin where "Today" sits
-        self.timeline_y = 120           # Y coordinate of the main line
-        self.canvas_width = 860         # Total width limit for the timeline track
-
-        self.setup_ui()
-        self.render_events()
-
-    def setup_ui(self):
-        # 1. Canvas for Timeline
-        self.canvas = tk.Canvas(self.root, bg="#f4f6f7", height=220)
-        self.canvas.pack(fill=tk.X, padx=10, pady=10)
-        # Bind canvas clicks to handle cluster inspection
-        self.canvas.bind("<Button-1>", self.on_canvas_click)
-
-        # 2. Input Controls Frame
-        control_frame = tk.Frame(self.root)
-        control_frame.pack(fill=tk.X, padx=15, pady=10)
-
-        # Event Title Input
-        tk.Label(control_frame, text="Event Name:").grid(row=0, column=0, padx=5, pady=5)
-        self.title_entry = tk.Entry(control_frame, width=20)
-        self.title_entry.insert(0, "Math test")
-        self.title_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        # Event Date Input (YYYY-MM-DD)
-        tk.Label(control_frame, text="Date (YYYY-MM-DD):").grid(row=0, column=2, padx=5, pady=5)
-        self.date_entry = tk.Entry(control_frame, width=12)
-        self.date_entry.insert(0, date.today().strftime("%Y-%m-%d"))
-        self.date_entry.grid(row=0, column=3, padx=5, pady=5)
-
-        # Color Selector Button
-        self.color_btn = tk.Button(
-            control_frame, text="Select Color", bg=self.selected_color, 
-            fg="white", command=self.pick_color
-        )
-        self.color_btn.grid(row=0, column=4, padx=5, pady=5)
-
-        # Add Event Button
-        add_btn = tk.Button(
-            control_frame, text="Add to Timeline", bg="#2ecc71", 
-            fg="white", font=("Arial", 10, "bold"), command=self.add_event
-        )
-        add_btn.grid(row=0, column=5, padx=15, pady=5)
-
-    def pick_color(self):
-        color_code = colorchooser.askcolor(title="Choose Circle Color")[1]
-        if color_code:
-            self.selected_color = color_code
-            self.color_btn.config(bg=color_code)
-
-    def add_event(self):
-        title = self.title_entry.get().strip()
-        date_str = self.date_entry.get().strip()
-
-        if not title or not date_str:
-            messagebox.showwarning("Input Error", "Please enter both title and date!")
-            return
-
+    parts = date_text.split(".")
+    if len(parts) == 3 and all(p.isdigit() for p in parts): # kak rabortaet p.isdigit()
         try:
-            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            messagebox.showerror("Date Error", "Please use format: YYYY-MM-DD")
+            # Convert string to date object for math & sorting
+            event_date = datetime.strptime(date_text, "%d.%m.%Y").date()
+
+            today = date.today()
+            delta = event_date - today
+            days_remaining = delta.days
+
+            # Create the event record dictionary
+            event_record = {
+                "name": name,
+                "date_str": date_text,
+                "date_obj": event_date,
+                "days_left": days_remaining,
+                "sub_goals": subby
+            }
+            
+            all_events.append(event_record)
+
+            # 2. Sort the list chronologically by date objects
+            # (Nearest/past dates at top, furthest dates at the bottom)
+            all_events.sort(key=lambda x: x['date_obj']) # chto takoe lambda 
+ 
+            # Clear entry boxes for the next input
+            name_entry.delete(0, tk.END)
+            date_entry.delete(0, tk.END)
+
+            # Refresh the visual display list
+            update_display()
+            status_label.config(text="Event added successfully!", fg="green")
             return
 
-        days_left = (target_date - date.today()).days
+        except ValueError:
+            status_label.config(text="Invalid date! (Check for impossible days like Feb 31)", fg="red")
+            return
 
-        self.events.append({
-            "title": title,
-            "days_left": days_left,
-            "date_str": date_str,
-            "color": self.selected_color
-        })
+    status_label.config(text="Invalid format. Please use DD.MM.YYYY", fg="red")
 
-        # Sort events chronologically by days_left
-        self.events.sort(key=lambda x: x["days_left"])
-        self.render_events()
-
-    def cluster_events(self):
-        """Groups events that are within 5 days of each other."""
-        if not self.events:
-            return []
-
-        clusters = []
-        current_cluster = [self.events[0]]
-
-        for ev in self.events[1:]:
-            # If the event is within 5 days of the first event in the current cluster
-            if ev["days_left"] - current_cluster[0]["days_left"] <= 5:
-                current_cluster.append(ev)
-            else:
-                clusters.append(current_cluster)
-                current_cluster = [ev]
-        clusters.append(current_cluster)
-        return clusters
-
-    def render_events(self):
-        self.canvas.delete("all")
-        self.rendered_clusters = []  # Keep track of clickable clusters for interaction
-
-        # 1. Calculate Dynamic Scale based on furthest event
-        future_days = [ev["days_left"] for ev in self.events if ev["days_left"] > 0]
-        max_days = max(future_days) if future_days else 30
-        
-        available_width = self.canvas_width - self.origin_x - 40
-        px_per_day = max(available_width / max_days, 2)
-
-        # Draw timeline axis line
-        line_end_x = self.origin_x + (max_days * px_per_day) + 30
-        self.canvas.create_line(
-            self.origin_x, self.timeline_y, max(line_end_x, 850), self.timeline_y, 
-            fill="#7f8c8d", width=3, arrow=tk.LAST
+def open_new_window():
+    # Opens a new standard tkinter Toplevel window
+    new_win = tk.Toplevel(root)
+    new_win.title("Event Details")
+    new_win.geometry("300x200")
+    sub = subby.get().strip()
+    lbl = tk.Label(new_win, text=sub, font=("Arial", 11))
+    lbl.pack(expand=True)
+    
+    close_btn = tk.Button(new_win, text="Close", command=new_win.destroy)
+    close_btn.pack(pady=10)
+def update_display():
+    # Clear old buttons from previous updates so they don't duplicate
+    for widget in scrollable_frame.winfo_children():
+        widget.destroy()
+    
+    for event in all_events:
+        days = event['days_left']
+        if days > 0:
+            time_text = f"{days} days left"
+        elif days == 0:
+            time_text = "Proeb!"
+        else:
+            time_text = f"{-(days)} days ago"
+            
+        # Create a standard tk.Button inside the scrollable frame
+        row_button = tk.Button(
+            scrollable_frame, 
+            text=f"• {event['name']} ({event['date_str']}) — {time_text}",
+            command=open_new_window,
+            anchor="w",                  # Aligns text to the left
+            relief="flat",               # Gives it a flat, modern look
+            bg="#f8f9fa",
+            activebackground="#e9ecef",
+            padx=10,
+            pady=6
         )
+        # Pack it so it stretches across the width of the frame
+        row_button.pack(fill="x", pady=2, padx=2)
 
-        # Draw Sparrow / Today Marker
-        today_str = date.today().strftime("%b %d, %Y")
-        self.canvas.create_text(
-            self.origin_x, self.timeline_y - 35, 
-            text="🐦 Today", font=("Arial", 14, "bold"), fill="#2c3e50"
-        )
-        self.canvas.create_text(
-            self.origin_x, self.timeline_y - 15, 
-            text=today_str, font=("Arial", 9, "italic"), fill="#7f8c8d"
-        )
-        self.canvas.create_line(
-            self.origin_x, self.timeline_y - 8, 
-            self.origin_x, self.timeline_y + 8, 
-            fill="#e74c3c", width=2
-        )
+root = tk.Tk()
+root.title("Event Countdown Tracker")
+root.geometry("400x700")
 
-        # 2. Render Clusters
-        clusters = self.cluster_events()
-        for cluster in clusters:
-            # Position cluster at the average or first event's day count
-            avg_days = sum(ev["days_left"] for ev in cluster) / len(cluster)
-            x_pos = self.origin_x + (avg_days * px_per_day)
-            r = 12
+# Event Name Field
+tk.Label(root, text="Event Name:", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+name_entry = tk.Entry(root, width=30, font=("Arial", 11))
+name_entry.pack(pady=5)
 
-            if len(cluster) == 1:
-                # Single event display
-                ev = cluster[0]
-                self.canvas.create_oval(
-                    x_pos - r, self.timeline_y - r, 
-                    x_pos + r, self.timeline_y + r, 
-                    fill=ev["color"], outline="#ffffff", width=2, tags=("cluster", str(id(cluster)))
-                )
-                self.canvas.create_text(
-                    x_pos, self.timeline_y + 25, 
-                    text=ev["title"], font=("Arial", 9, "bold"), fill="#34495e"
-                )
-                days_text = f"{ev['days_left']}d left" if ev['days_left'] >= 0 else f"{abs(ev['days_left'])}d ago"
-                self.canvas.create_text(
-                    x_pos, self.timeline_y + 40, 
-                    text=days_text, font=("Arial", 8), fill="#7f8c8d"
-                )
-            else:
-                # Multiple events grouped together (Cluster circle with count)
-                self.canvas.create_oval(
-                    x_pos - r, self.timeline_y - r, 
-                    x_pos + r, self.timeline_y + r, 
-                    fill="#e67e22", outline="#ffffff", width=2, tags=("cluster", str(id(cluster)))
-                )
-                # Display count inside the circle
-                self.canvas.create_text(
-                    x_pos, self.timeline_y, 
-                    text=str(len(cluster)), font=("Arial", 9, "bold"), fill="#ffffff"
-                )
-                # Label below cluster
-                self.canvas.create_text(
-                    x_pos, self.timeline_y + 25, 
-                    text=f"{len(cluster)} events", font=("Arial", 9, "bold"), fill="#d35400"
-                )
-                days_text = f"Around {int(avg_days)}d left"
-                self.canvas.create_text(
-                    x_pos, self.timeline_y + 40, 
-                    text=days_text, font=("Arial", 8), fill="#7f8c8d"
-                )
+# Date Field
+tk.Label(root, text="Date (DD.MM.YYYY):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+date_entry = tk.Entry(root, width=30, font=("Arial", 11))
+date_entry.pack(pady=5)
 
-            # Store mapping so click detection knows which cluster was clicked
-            self.rendered_clusters.append({
-                "bbox": (x_pos - r, self.timeline_y - r, x_pos + r, self.timeline_y + r),
-                "cluster": cluster
-            })
+tk.Label(root, text="Sub goals:", font=("Arial", 10, "bold")).pack(pady=(2.5, 0))
+subby = tk.Entry(root, width=30, font=("Arial", 11))
+subby.pack(pady=5)
 
-    def on_canvas_click(self, event):
-        """Checks if a cluster circle was clicked and opens an info window."""
-        for item in self.rendered_clusters:
-            x1, y1, x2, y2 = item["bbox"]
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
-                cluster = item["cluster"]
-                
-                # Build a detailed message showing all events in this cluster
-                details = f"Events in this timeframe ({len(cluster)} total):\n\n"
-                for ev in cluster:
-                    details += f"• {ev['title']} — Date: {ev['date_str']} ({ev['days_left']} days left)\n"
-                
-                messagebox.showinfo("Cluster Details", details)
-                break
+# Submit Button
+submit_btn = tk.Button(root, text="Add Event", command=add_event, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
+submit_btn.pack(pady=50)
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = SparrowTimelineApp(root)
-    root.mainloop()
+# Status Feedback Label
+status_label = tk.Label(root, text="", font=("Arial", 9))
+status_label.pack(pady=2)
+# --- 1. CREATE A SCROLLABLE FRAME CONTAINER (Standard Tkinter) ---
+container = tk.Frame(root)
+container.pack(fill="both", expand=True, padx=10, pady=10)
+
+canvas = tk.Canvas(container, bg="white", highlightthickness=0)
+scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+
+# This is where your event buttons will live
+scrollable_frame = tk.Frame(canvas, bg="white")
+
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+
+# Start the application loop
+root.mainloop()
