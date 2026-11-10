@@ -1,93 +1,55 @@
 import tkinter as tk
 from datetime import datetime, date
-import os
 
-# Faili nimi kuhu kõike salvestatakse ja mida kuvatakse programmi käivitamisel
-DATA_FILE = "events.txt"
+#Teema:Sihtmärgi saavutamise programm
+#Osalejad Kirill Šadrin ja Maksim Malõšev
+#Projekt on suunatud aidata planeerida oma graafikut
+#Töös olid kasutatud vabad allikad ja python dokumentatsioon koos tehisaruga
+#Kõik muutujad koodis on inglise keelsed või on inspireeritud mõnest inglise keele sõnast
+#Kõik seletused on kirjutatud eesti keeles
 
-# Peamine list, kuhu salvestatakse kõik sündmuste andmed sõnastikena
+# Põhi andmebaas mis hoiab kõik sündmused mis kasutaja kirjutas
+# Plaanis salvestada seda andmebaasi failisse et andmed salvestasid järgi kasutamiseks
 all_events = []
-
-def load_events():  
-    """Loads events from a plain text file on startup."""
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Split the line by '|' to get name and date string back
-                parts = line.split("|")
-                if len(parts) == 2:
-                    name = parts[0]
-                    date_str = parts[1]
-                    
-                    try:
-                        event_date = datetime.strptime(date_str, "%d.%m.%Y").date()
-                        today = date.today()
-                        delta = event_date - today
-                        
-                        event_record = {
-                            "name": name,
-                            "date_str": date_str,
-                            "date_obj": event_date,
-                            "days_left": delta.days
-                        }
-                        all_events.append(event_record)
-                    except ValueError:
-                        pass # Ignore corrupted lines
-            
-            # Sort chronologically after loading
-            all_events.sort(key=lambda x: x['date_obj'])
-
-def save_events():  # sündmuste failisse sissekirjutamiseks, salvestab puhtalt tekstina mida hiljem load_events ümbertöötleb andmeks
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        for event in all_events:
-            # Write each event as: Name|DD.MM.YYYY
-            f.write(f"{event['name']}|{event['date_str']}\n")
-
 def add_event():
-    name = name_entry.get().strip() # nimeks saab aknast name_entry stringina tänau .get()
-    date_text = date_entry.get().strip() #saab kuupäeva aknast date_entry stringina
+    # Võtav sisestatud andmed ning töötleb neid et sisesta hulka event_record sisse
+    name = name_entry.get().strip()
+    date_text = date_entry.get().strip()
     
-    # 1. Kontroll kas aknas on sisestatud sündmuse nimi
+    # Vaatab kas sündmuse nimi oli korrektselt sissestatud
     if not name:
         status_label.config(text="Please enter an event name.", fg="red")
         return
-
-    parts = date_text.split(".") #Kuupäeva sisestus jagatakse punktide järgi osadeks Päev.Kuu.Aasta -> ['Päev', 'Kuu', 'Aasta']
-    if len(parts) == 3 and all(p.isdigit() for p in parts): #kui osade arv on 3 ja kõik osad on numbrid, siis jätkatakse
+    # Töödeldab edasi jäänud info mida kasutaja annab
+    parts = date_text.split(".")
+    if len(parts) == 3 and all(p.isdigit() for p in parts): # kak rabortaet p.isdigit()
         try:
-            # Kasutades datetime konverteerib stringi kuupäevaks
-            event_date = datetime.strptime(date_text, "%d.%m.%Y").date()
+             
+            event_date = datetime.strptime(date_text, "%d.%m.%Y").date() # Põhimõtteliselt lihtalt teeb tekstist arvu et arvutada päevade arv pärast
 
-            #peamine datetime rakends: leida mis kuupäev on täna ja arvutada kui palju päevi on sündmuseni jäänud
             today = date.today()
             delta = event_date - today
             days_remaining = delta.days
 
-            # Loob sõnastiku?
+            # Hulk mis hoiab ennast kõik vajalik info ühest sündmusest
             event_record = {
                 "name": name,
                 "date_str": date_text,
                 "date_obj": event_date,
-                "days_left": days_remaining
+                "days_left": days_remaining,
+                "sub_goals": subby
             }
             
-            all_events.append(event_record) #lisab sõnastiku listi all_events
+            all_events.append(event_record)
 
-            # 2. Sort the list chronologically by date objects
-            all_events.sort(key=lambda x: x['date_obj'])
-            
-            # Save to text file immediately after adding
-            save_events()
+            # Sorteerib andmeid et kõige lähedamad sündmused oleksid kirjas esimesena
+            all_events.sort(key=lambda x: x['date_obj']) # sorteerib all_events kasutated võrdlemiseks funktsiooni lambda, mille muutuja x on muutuja event_date
  
-            # Clear entry boxes for the next input
+            # Puhastab sisestus akna
             name_entry.delete(0, tk.END)
             date_entry.delete(0, tk.END)
 
-            # Refresh the visual display list
+            # Nagu ütleb funktsiooni nimi uuendab ekraani, programmi sissu seletus on all
             update_display()
             status_label.config(text="Event added successfully!", fg="green")
             return
@@ -98,30 +60,49 @@ def add_event():
 
     status_label.config(text="Invalid format. Please use DD.MM.YYYY", fg="red")
 
+def open_new_window():
+    # Opens a new standard tkinter Toplevel window
+    new_win = tk.Toplevel(root)
+    new_win.title("Event Details")
+    new_win.geometry("300x200")
+    sub = subby.get().strip()
+    lbl = tk.Label(new_win, text=sub, font=("Arial", 11))
+    lbl.pack(expand=True)
+    
+    close_btn = tk.Button(new_win, text="Close", command=new_win.destroy)
+    close_btn.pack(pady=10)
 def update_display():
-    # Enable the text widget temporarily to insert text
-    display_box.config(state=tk.NORMAL)
-    display_box.delete("1.0", tk.END)
+    # Clear old buttons from previous updates so they don't duplicate
+    for widget in scrollable_frame.winfo_children():
+        widget.destroy()
     
     for event in all_events:
         days = event['days_left']
         if days > 0:
-            time_text = f"{days} on jäänud"
+            time_text = f"{days} days left"
         elif days == 0:
-            time_text = "Täna"
+            time_text = "Proeb!"
         else:
-            time_text = f"{-(days)} päevi tagasi"
+            time_text = f"{-(days)} days ago"
             
-        line = f"• {event['name']} ({event['date_str']}) — {time_text}\n"
-        display_box.insert(tk.END, line)
-        
-    # Make it read-only again so users can't manually type inside it
-    display_box.config(state=tk.DISABLED)
+        # Create a standard tk.Button inside the scrollable frame
+        row_button = tk.Button(
+            scrollable_frame, 
+            text=f"• {event['name']} ({event['date_str']}) — {time_text}",
+            command=open_new_window,
+            anchor="w",                  # Aligns text to the left
+            relief="flat",               # Gives it a flat, modern look
+            bg="#f8f9fa",
+            activebackground="#e9ecef",
+            padx=10,
+            pady=6
+        )
+        # Pack it so it stretches across the width of the frame
+        row_button.pack(fill="x", pady=2, padx=2)
 
-#GUI Window Setup
 root = tk.Tk()
 root.title("Event Countdown Tracker")
-root.geometry("400x450")
+root.geometry("400x700")
 
 # Event Name Field
 tk.Label(root, text="Event Name:", font=("Arial", 10, "bold")).pack(pady=(15, 0))
@@ -133,24 +114,38 @@ tk.Label(root, text="Date (DD.MM.YYYY):", font=("Arial", 10, "bold")).pack(pady=
 date_entry = tk.Entry(root, width=30, font=("Arial", 11))
 date_entry.pack(pady=5)
 
+tk.Label(root, text="Sub goals:", font=("Arial", 10, "bold")).pack(pady=(2.5, 0))
+subby = tk.Entry(root, width=30, font=("Arial", 11))
+subby.pack(pady=5)
+
 # Submit Button
 submit_btn = tk.Button(root, text="Add Event", command=add_event, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
-submit_btn.pack(pady=10)
+submit_btn.pack(pady=50)
 
 # Status Feedback Label
 status_label = tk.Label(root, text="", font=("Arial", 9))
 status_label.pack(pady=2)
+# --- 1. CREATE A SCROLLABLE FRAME CONTAINER (Standard Tkinter) ---
+container = tk.Frame(root)
+container.pack(fill="both", expand=True, padx=10, pady=10)
 
-# Display Area Header
-tk.Label(root, text="Saved Events (Closest to Furthest):", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+canvas = tk.Canvas(container, bg="white", highlightthickness=0)
+scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
 
-# Text Box to show stored events
-display_box = tk.Text(root, height=10, width=45, state=tk.DISABLED, font=("Arial", 10))
-display_box.pack(pady=5)
+# This is where your event buttons will live
+scrollable_frame = tk.Frame(canvas, bg="white")
 
-#Load previous data and refresh display on startup
-load_events()
-update_display()
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
 
-# start the application loop
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+
+# Start the application loop
 root.mainloop()
