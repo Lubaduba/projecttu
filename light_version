@@ -1,29 +1,73 @@
 import tkinter as tk
 from datetime import datetime, date
+import os
 
-# Main list to store dictionaries of event data
+# Faili nimi kuhu kõike salvestatakse ja mida kuvatakse programmi käivitamisel
+DATA_FILE = "events.txt"
+
+# Peamine list, kuhu salvestatakse kõik sündmuste andmed sõnastikena
 all_events = []
 
+def load_events():  
+    """Loads events from a plain text file on startup."""
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Split the line by '|' to get name and date string back
+                parts = line.split("|")
+                if len(parts) == 2:
+                    name = parts[0]
+                    date_str = parts[1]
+                    
+                    try:
+                        event_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+                        today = date.today()
+                        delta = event_date - today
+                        
+                        event_record = {
+                            "name": name,
+                            "date_str": date_str,
+                            "date_obj": event_date,
+                            "days_left": delta.days
+                        }
+                        all_events.append(event_record)
+                    except ValueError:
+                        pass # Ignore corrupted lines
+            
+            # Sort chronologically after loading
+            all_events.sort(key=lambda x: x['date_obj'])
+
+def save_events():  # sündmuste failisse sissekirjutamiseks, salvestab puhtalt tekstina mida hiljem load_events ümbertöötleb andmeks
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        for event in all_events:
+            # Write each event as: Name|DD.MM.YYYY
+            f.write(f"{event['name']}|{event['date_str']}\n")
+
 def add_event():
-    name = name_entry.get().strip()
-    date_text = date_entry.get().strip()
+    name = name_entry.get().strip() # nimeks saab aknast name_entry stringina tänau .get()
+    date_text = date_entry.get().strip() #saab kuupäeva aknast date_entry stringina
     
-    # 1. Make sure the user typed an event name
+    # 1. Kontroll kas aknas on sisestatud sündmuse nimi
     if not name:
         status_label.config(text="Please enter an event name.", fg="red")
         return
 
-    parts = date_text.split(".")
-    if len(parts) == 3 and all(p.isdigit() for p in parts): # kak rabortaet p.isdigit()
+    parts = date_text.split(".") #Kuupäeva sisestus jagatakse punktide järgi osadeks Päev.Kuu.Aasta -> ['Päev', 'Kuu', 'Aasta']
+    if len(parts) == 3 and all(p.isdigit() for p in parts): #kui osade arv on 3 ja kõik osad on numbrid, siis jätkatakse
         try:
-            # Convert string to date object for math & sorting
+            # Kasutades datetime konverteerib stringi kuupäevaks
             event_date = datetime.strptime(date_text, "%d.%m.%Y").date()
 
+            #peamine datetime rakends: leida mis kuupäev on täna ja arvutada kui palju päevi on sündmuseni jäänud
             today = date.today()
             delta = event_date - today
             days_remaining = delta.days
 
-            # Create the event record dictionary
+            # Loob sõnastiku?
             event_record = {
                 "name": name,
                 "date_str": date_text,
@@ -31,11 +75,13 @@ def add_event():
                 "days_left": days_remaining
             }
             
-            all_events.append(event_record)
+            all_events.append(event_record) #lisab sõnastiku listi all_events
 
             # 2. Sort the list chronologically by date objects
-            # (Nearest/past dates at top, furthest dates at the bottom)
-            all_events.sort(key=lambda x: x['date_obj']) # chto takoe lambda 
+            all_events.sort(key=lambda x: x['date_obj'])
+            
+            # Save to text file immediately after adding
+            save_events()
  
             # Clear entry boxes for the next input
             name_entry.delete(0, tk.END)
@@ -60,11 +106,11 @@ def update_display():
     for event in all_events:
         days = event['days_left']
         if days > 0:
-            time_text = f"{days} days left"
+            time_text = f"{days} on jäänud"
         elif days == 0:
-            time_text = "Today!"
+            time_text = "Täna"
         else:
-            time_text = f"{-(days)} days ago"
+            time_text = f"{-(days)} päevi tagasi"
             
         line = f"• {event['name']} ({event['date_str']}) — {time_text}\n"
         display_box.insert(tk.END, line)
@@ -72,7 +118,7 @@ def update_display():
     # Make it read-only again so users can't manually type inside it
     display_box.config(state=tk.DISABLED)
 
-# --- GUI Window Setup ---
+#GUI Window Setup
 root = tk.Tk()
 root.title("Event Countdown Tracker")
 root.geometry("400x450")
@@ -102,5 +148,9 @@ tk.Label(root, text="Saved Events (Closest to Furthest):", font=("Arial", 10, "b
 display_box = tk.Text(root, height=10, width=45, state=tk.DISABLED, font=("Arial", 10))
 display_box.pack(pady=5)
 
-# Start the application loop
+#Load previous data and refresh display on startup
+load_events()
+update_display()
+
+# start the application loop
 root.mainloop()
