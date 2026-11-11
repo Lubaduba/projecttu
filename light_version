@@ -36,7 +36,7 @@ def load_events():
                         today = date.today()
                         delta = event_date - today
                         
-                        # Hulk, mis hoiab endas kogu vajalikku infot ühest sündmusest
+                        # sõnastik, mis hoiab endas kogu vajalikku infot ühest sündmusest
                         event_record = {
                             "name": name,
                             "date_str": date_str,
@@ -102,7 +102,7 @@ def add_event():
 
             # Uuendab akna, tuues uue sündmuse ekraanile
             update_display()
-            status_label.config(text="Event added successfully!", fg="green") # Tagasiside, et õnnestus
+            status_label.config(text="Salvestatud!", fg="green") # Tagasiside, et õnnestus
             return
 
         # Pöörame musta silma vigadele (nt veebruari 31. kuupäev)
@@ -110,15 +110,15 @@ def add_event():
             status_label.config(text="Invalid date! (Check for impossible days like Feb 31)", fg="red")
             return
 
-    status_label.config(text="Invalid format. Please use DD.MM.YYYY", fg="red")
+    status_label.config(text="Vale viis, kasutage PP.KK.AAAA", fg="red")
 
 def open_new_window(event_data):
     # Avab uue standardse tkinter Toplevel akna konkreetse sündmuse detailidega
     new_win = tk.Toplevel(root)
-    new_win.title(f"Details: {event_data['name']}")
+    new_win.title(f"Täpsemalt: {event_data['name']}")
     new_win.geometry("300x200")
     
-    sub_text = event_data['sub_goals'] if event_data['sub_goals'] else "No sub-goals specified for this event."
+    sub_text = event_data['sub_goals'] if event_data['sub_goals'] else "Siin ei ole midagi"
     lbl = tk.Label(new_win, text=sub_text, font=("Arial", 11), wraplength=250)
     lbl.pack(expand=True)
     
@@ -127,7 +127,7 @@ def open_new_window(event_data):
 
 def update_display():
     # Puhastab vanad nupud eelmistest uuendustest, et need ei dubleeruks
-    for widget in scrollable_frame.winfo_children():
+    for widget in events_frame.winfo_children():
         widget.destroy()
     
     for event in all_events:
@@ -139,9 +139,9 @@ def update_display():
         else:
             time_text = f"{-(days)} days ago"
             
-        # Loob stiilse nupu igale sündmusele scrollitavasse raami
+        # Loob stiilse nupu igale sündmusele tavalises raamis
         row_button = tk.Button(
-            scrollable_frame, 
+            events_frame, 
             text=f"• {event['name']} ({event['date_str']}) — {time_text}",
             command=lambda e=event: open_new_window(e),
             anchor="w",                  # Aligns text to the left
@@ -154,57 +154,40 @@ def update_display():
         # Packib, et see täidaks laiuselt ära raami
         row_button.pack(fill="x", pady=2, padx=2)
 
-# Loob akna
+# Loob peaakna
 root = tk.Tk()
-root.title("Event Countdown Tracker")
-root.geometry("400x750")
+root.title("Sündmuste saavutaja")
+root.geometry("400x700")
 
 # Pealkiri 1 (Nimi)
-tk.Label(root, text="Event Name:", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+tk.Label(root, text="Sündmus: ", font=("Arial", 10, "bold")).pack(pady=(15, 0))
 name_entry = tk.Entry(root, width=30, font=("Arial", 11))
 name_entry.pack(pady=5)
 
 # Pealkiri 2 (Kuupäev)
-tk.Label(root, text="Date (DD.MM.YYYY):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+tk.Label(root, text="Kuupäev (DD.MM.YYYY):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
 date_entry = tk.Entry(root, width=30, font=("Arial", 11))
 date_entry.pack(pady=5)
 
 # Pealkiri 3 (Sub goals)
-tk.Label(root, text="Sub goals:", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+tk.Label(root, text="Täpsustus", font=("Arial", 10, "bold")).pack(pady=(5, 0))
 subby = tk.Entry(root, width=30, font=("Arial", 11))
 subby.pack(pady=5)
 
-# Submit Button ("Salvesta" nupp)
-submit_btn = tk.Button(root, text="Add Event", command=add_event, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
+#"Salvesta" nupp
+submit_btn = tk.Button(root, text="Lisa sündmus: ", command=add_event, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
 submit_btn.pack(pady=10)
 
-# Status Feedback Label (Väljastab tagasisidet)
+#Väljastab tagasisidet
 status_label = tk.Label(root, text="", font=("Arial", 9))
 status_label.pack(pady=2)
 
 # Pealkiri konteineri kohal
-tk.Label(root, text="Saved Events (Closest to Furthest):", font=("Arial", 10, "bold")).pack(pady=(15, 0))
+tk.Label(root, text="Salvestatud sündmused: ", font=("Arial", 10, "bold")).pack(pady=(15, 0))
 
-# --- SCROLLABLE FRAME CONTAINER ---
-container = tk.Frame(root)
-container.pack(fill="both", expand=True, padx=10, pady=10) # Täidab x ja y teljel akna, expand teeb akna suurust muutvaks
-
-canvas = tk.Canvas(container, bg="white", highlightthickness=0)
-scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
-
-# Siin elavad kõik sündmuste nupud
-scrollable_frame = tk.Frame(canvas, bg="white")
-
-scrollable_frame.bind(
-    "<Configure>",
-    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-)
-
-canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-canvas.configure(yscrollcommand=scrollbar.set)
-
-canvas.pack(side="left", fill="both", expand=True)
-scrollbar.pack(side="right", fill="y")
+#avab uue frame
+events_frame = tk.Frame(root, bg="white")
+events_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
 # Loeb eelnevad andmed failist ja uuendab ekraani käivitamisel
 load_events()
